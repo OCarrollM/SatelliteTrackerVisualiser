@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { TextureLoader } from 'three';
 import { useLoader } from '@react-three/fiber';
@@ -37,35 +37,66 @@ function Background() {
 }
 
 function SatelliteMarkers({ satellites }) {
-  const markers = satellites.map((sat, index) => {
-    const satrec = satellite.twoline2satrec(sat.line1, sat.line2);
-    const positionAndVelocity = satellite.propagate(satrec, new Date());
-    const positionEci = positionAndVelocity.position;
+  const { camera } = useThree(); // Access the camera
+  const [visibleSatellites, setVisibleSatellites] = useState([]);
+  const [lastCameraDistance, setLastCameraDistance] = useState(0);
 
-    if(!positionEci) return null;
+  useFrame(() => {
+    const cameraDistance = camera.position.length(); // Get the camera distance
 
-    // Convert esi to long,lat,alt
-    const gmst = satellite.gstime(new Date());
-    const positionGd = satellite.eciToGeodetic(positionEci, gmst);
-    const longitude = satellite.degreesLong(positionGd.longitude);
-    const latitude = satellite.degreesLat(positionGd.latitude);
+    // Check if the camera distance has significantly changed
+    if (Math.abs(cameraDistance - lastCameraDistance) > 0.1) {
+      setLastCameraDistance(cameraDistance); // Update last camera distance
 
-    // conver lat,long to coords
-    const radius = 2 + 0.1;
-    const x = radius * Math.cos(latitude * (Math.PI / 180)) * Math.cos(longitude * (Math.PI / 180));
-    const y = radius * Math.sin(latitude * (Math.PI / 180));
-    const z = radius * Math.cos(latitude * (Math.PI / 180)) * Math.sin(longitude * (Math.PI / 180));
+      // Filter satellites based on camera distance
+      const filteredSatellites = satellites.filter((_, index) => {
+        if (cameraDistance < 5) {
+          return index % 10 === 0; // Show every 10th satellite when zoomed in close
+        } else if (cameraDistance < 10) {
+          return index % 5 === 0; // Show every 5th satellite at medium distance
+        } else if (cameraDistance < 20) {
+          return index % 2 === 0; // Show every 2nd satellite at further distances
+        } else {
+          return true; // Show all satellites when zoomed out far
+        }
+      });
 
-    return (
-      <mesh key={index} position={[x, y, z]}>
-        <sphereGeometry args={[0.02, 16, 16]} />
-        <meshStandardMaterial color="yellow" />
-      </mesh>
-    );
+      setVisibleSatellites(filteredSatellites); // Update visible satellites state
+    }
   });
 
-  return <>{markers}</>
+  return (
+    <>
+      {visibleSatellites.map((sat, index) => {
+        const satrec = satellite.twoline2satrec(sat.line1, sat.line2);
+        const positionAndVelocity = satellite.propagate(satrec, new Date());
+        const positionEci = positionAndVelocity.position;
+
+        if (!positionEci) return null;
+
+        const gmst = satellite.gstime(new Date());
+        const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+        const longitude = satellite.degreesLong(positionGd.longitude);
+        const latitude = satellite.degreesLat(positionGd.latitude);
+
+        const radius = 2 + 0.1;
+        const x = radius * Math.cos(latitude * (Math.PI / 180)) * Math.cos(longitude * (Math.PI / 180));
+        const y = radius * Math.sin(latitude * (Math.PI / 180));
+        const z = radius * Math.cos(latitude * (Math.PI / 180)) * Math.sin(longitude * (Math.PI / 180));
+
+        return (
+          <mesh key={index} position={[x, y, z]}>
+            <sphereGeometry args={[0.02, 16, 16]} />
+            <meshStandardMaterial color="yellow" />
+          </mesh>
+        );
+      })}
+    </>
+  );
 }
+
+
+
 
 function App() {
   const [satellites, setSatellites] = useState([]);
