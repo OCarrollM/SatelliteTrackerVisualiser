@@ -36,7 +36,8 @@ function Background() {
   )
 }
 
-function SatelliteMarkers({ satellites }) {
+function SatelliteMarkers({ satellites, onSelect }) {
+  console.log('onSelect:', onSelect);
   const { camera } = useThree(); // Access the camera
   const [visibleSatellites, setVisibleSatellites] = useState([]);
   const [lastCameraDistance, setLastCameraDistance] = useState(0);
@@ -85,7 +86,14 @@ function SatelliteMarkers({ satellites }) {
         const z = radius * Math.cos(latitude * (Math.PI / 180)) * Math.sin(longitude * (Math.PI / 180));
 
         return (
-          <mesh key={index} position={[x, y, z]}>
+          <mesh
+            key={index}
+            position={[x, y, z]} 
+            onClick={() => {
+              console.log('Selected Satellite:', sat);
+              onSelect(sat);
+            }}
+          >
             <sphereGeometry args={[0.02, 16, 16]} />
             <meshStandardMaterial color="yellow" />
           </mesh>
@@ -95,11 +103,22 @@ function SatelliteMarkers({ satellites }) {
   );
 }
 
+function SatelliteDetails({ satellite }) {
+  if (!satellite) return null;
 
+  return (
+    <div style={{ position: 'absolute', top: 10, left: 10, backgroundColor: 'white', padding: '10px', borderRadius: '5px '}}>
+      <h3>{satellite.name}</h3>
+      <p>Line 1: {satellite.line1}</p>
+      <p>Line 2: {satellite.line2}</p>
+    </div>
+  );
+}
 
 
 function App() {
   const [satellites, setSatellites] = useState([]);
+  const [selectedSatellite, setSelectedSatellite] = useState(null);
 
   useEffect(() => {
     // Fetch data
@@ -131,23 +150,27 @@ function App() {
   };
 
   return (
-    <Canvas style={{ height: '100vh', backgroundColor: 'black' }}>
-      {/* Background */}
-      <Background />
+    <>
+      <Canvas style={{ height: '100vh', backgroundColor: 'black' }}>
+        {/* Background */}
+        <Background />
 
-      {/* Rotating cube */}
-      <RotatingGlobe />
+        {/* Rotating cube */}
+        <RotatingGlobe />
 
-      {/* Satellites */}
-      <SatelliteMarkers satellites={satellites} />
+        {/* Satellites */}
+        <SatelliteMarkers satellites={satellites} onSelect={setSelectedSatellite} />
 
-      {/* Lighting */}
-      <ambientLight intensity={2} />
-      <directionalLight position={[5, 5, 5]} />
+        {/* Lighting */}
+        <ambientLight intensity={2} />
+        <directionalLight position={[5, 5, 5]} />
 
-      {/* Controls */}
-      <OrbitControls />
-    </Canvas>
+        {/* Controls */}
+        <OrbitControls />
+      </Canvas>
+
+      <SatelliteDetails satellite={selectedSatellite} />
+    </>
   );
 }
 
