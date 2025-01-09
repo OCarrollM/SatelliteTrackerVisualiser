@@ -37,10 +37,18 @@ function Background() {
 }
 
 function SatelliteMarkers({ satellites, onSelect }) {
-  console.log('onSelect:', onSelect);
-  const { camera } = useThree(); // Access the camera
+  const { camera, size } = useThree(); // Access the camera
+  const [tooltipPosition, setTooltipPosition] = useState(null);
   const [visibleSatellites, setVisibleSatellites] = useState([]);
   const [lastCameraDistance, setLastCameraDistance] = useState(0);
+
+  const handleClick = (satellite, position) => {
+    const screenPosition = position.clone().project(camera);
+    const x = (screenPosition.x * 0.5 + 0.5) * size.width;
+    const y = (-screenPosition.y * 0.5 + 0.5) * size.height;
+
+    onSelect(satellite, { x, y });
+  };
 
   useFrame(() => {
     const cameraDistance = camera.position.length(); // Get the camera distance
@@ -89,10 +97,7 @@ function SatelliteMarkers({ satellites, onSelect }) {
           <mesh
             key={index}
             position={[x, y, z]} 
-            onClick={() => {
-              console.log('Selected Satellite:', sat);
-              onSelect(sat);
-            }}
+            onClick = {(e) => handleClick(sat, e.object.position)}
           >
             <sphereGeometry args={[0.02, 16, 16]} />
             <meshStandardMaterial color="yellow" />
@@ -103,12 +108,34 @@ function SatelliteMarkers({ satellites, onSelect }) {
   );
 }
 
-function SatelliteDetails({ satellite }) {
+function SatelliteDetails({ satellite, position }) {
+  const [tooltipStyle, setTooltipStyle] = useState({});
+
+  useEffect(() => {
+    if (position) {
+      const { x, y } = position;
+
+      setTooltipStyle({
+        position: 'absolute',
+        left: `${x + 10}px`,
+        top: `${y - 30}px`,
+        padding: '10px',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        color: '#fff',
+        borderRadius: '8px',
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+        transition: 'opacity 0.3s ease',
+        opacity: satellite ? 1 : 0,
+        pointerEvent: 'none',
+      });
+    }
+  }, [position, satellite]);
+
   if (!satellite) return null;
 
   return (
-    <div style={{ position: 'absolute', top: 10, left: 10, backgroundColor: 'white', padding: '10px', borderRadius: '5px '}}>
-      <h3>{satellite.name}</h3>
+    <div style={tooltipStyle}>
+      <strong>{satellite.name}</strong>
       <p>Line 1: {satellite.line1}</p>
       <p>Line 2: {satellite.line2}</p>
     </div>
@@ -119,6 +146,12 @@ function SatelliteDetails({ satellite }) {
 function App() {
   const [satellites, setSatellites] = useState([]);
   const [selectedSatellite, setSelectedSatellite] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const handleSatelliteSelect = (satellite, position) => {
+    setSelectedSatellite(satellite);
+    setTooltipPosition(position);
+  };
 
   useEffect(() => {
     // Fetch data
@@ -159,7 +192,7 @@ function App() {
         <RotatingGlobe />
 
         {/* Satellites */}
-        <SatelliteMarkers satellites={satellites} onSelect={setSelectedSatellite} />
+        <SatelliteMarkers satellites={satellites} onSelect={handleSatelliteSelect} />
 
         {/* Lighting */}
         <ambientLight intensity={2} />
@@ -169,7 +202,7 @@ function App() {
         <OrbitControls />
       </Canvas>
 
-      <SatelliteDetails satellite={selectedSatellite} />
+      <SatelliteDetails satellite={selectedSatellite} position={tooltipPosition} />
     </>
   );
 }
